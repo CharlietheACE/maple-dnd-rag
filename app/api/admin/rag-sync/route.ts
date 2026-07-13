@@ -1,12 +1,14 @@
 import { EMBEDDED_ERDA_CORPUS } from "@/src/rag/generated/embedded-corpus";
-import { authorizedSyncRequest, RuntimeOpenAITransport, syncRuntimeBatch } from "@/src/rag/runtime-sync";
+import { authorizedSameOriginSyncRequest, authorizedSyncRequest, RuntimeOpenAITransport, syncRuntimeBatch } from "@/src/rag/runtime-sync";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request): Promise<Response> {
   const token = process.env.ERDA_SYNC_TOKEN || "";
-  if (!authorizedSyncRequest(request, token)) return Response.json({ status: "unauthorized" }, { status: 401 });
+  if (!authorizedSyncRequest(request, token) && !authorizedSameOriginSyncRequest(request)) {
+    return Response.json({ status: "unauthorized" }, { status: 401 });
+  }
   const apiKey = process.env.OPENAI_API_KEY?.trim();
   const vectorStoreId = process.env.OPENAI_VECTOR_STORE_ID?.trim();
   if (!apiKey || !vectorStoreId) return Response.json({ status: "not_configured" }, { status: 503 });

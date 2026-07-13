@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { authorizedSyncRequest, planRuntimeBatch, RUNTIME_SYNC_CHUNKING, RuntimeOpenAITransport, syncRuntimeBatch, type EmbeddedDocument, type RemoteVectorFile, type RuntimeSyncTransport } from "../src/rag/runtime-sync.ts";
+import { authorizedSameOriginSyncRequest, authorizedSyncRequest, planRuntimeBatch, RUNTIME_SYNC_CHUNKING, RuntimeOpenAITransport, SAME_ORIGIN_SYNC_HEADER, syncRuntimeBatch, type EmbeddedDocument, type RemoteVectorFile, type RuntimeSyncTransport } from "../src/rag/runtime-sync.ts";
 
 const documents: EmbeddedDocument[] = Array.from({ length: 5 }, (_, index) => ({ path: `ErdaBook/${index}.md`, title: `标题${index}`, category: "root", contentHash: `hash${index}`, syncVersion: "sync-v1", content: `正文${index}` }));
 
@@ -9,6 +9,16 @@ test("rejects missing or incorrect sync bearer tokens", () => {
   assert.equal(authorizedSyncRequest(new Request("https://example.test"), token), false);
   assert.equal(authorizedSyncRequest(new Request("https://example.test", { headers: { Authorization: "Bearer wrong" } }), token), false);
   assert.equal(authorizedSyncRequest(new Request("https://example.test", { headers: { Authorization: `Bearer ${token}` } }), token), true);
+});
+
+test("same-origin sync authorization requires origin, browser fetch metadata, and dedicated header", () => {
+  const url = "https://private.example/admin/rag-sync";
+  const validHeaders = { Origin: "https://private.example", "Sec-Fetch-Site": "same-origin", "X-Erda-Sync": SAME_ORIGIN_SYNC_HEADER };
+  assert.equal(authorizedSameOriginSyncRequest(new Request(url, { headers: validHeaders })), true);
+  assert.equal(authorizedSameOriginSyncRequest(new Request(url, { headers: { ...validHeaders, Origin: "https://evil.example" } })), false);
+  assert.equal(authorizedSameOriginSyncRequest(new Request(url, { headers: { ...validHeaders, "Sec-Fetch-Site": "cross-site" } })), false);
+  assert.equal(authorizedSameOriginSyncRequest(new Request(url, { headers: { ...validHeaders, "X-Erda-Sync": "wrong" } })), false);
+  assert.equal(authorizedSameOriginSyncRequest(new Request(url, { headers: { Origin: "https://private.example" } })), false);
 });
 
 test("plans bounded cursor batches and skips matching completed hashes", () => {

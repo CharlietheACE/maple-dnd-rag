@@ -110,3 +110,12 @@ export function authorizedSyncRequest(request: Request, expected: string): boole
   for (let index = 0; index < length; index++) mismatch |= (actual.charCodeAt(index) || 0) ^ (expected.charCodeAt(index) || 0);
   return mismatch === 0 && expected.length >= 32;
 }
+
+export const SAME_ORIGIN_SYNC_HEADER = "interactive-private-sync";
+
+export function authorizedSameOriginSyncRequest(request: Request): boolean {
+  const requestOrigin = new URL(request.url).origin;
+  return request.headers.get("origin") === requestOrigin
+    && request.headers.get("sec-fetch-site") === "same-origin"
+    && request.headers.get("x-erda-sync") === SAME_ORIGIN_SYNC_HEADER;
+}
