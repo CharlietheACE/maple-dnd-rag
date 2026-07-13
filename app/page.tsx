@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
+import { ChatExperience } from "./chat-experience";
 
 export const metadata: Metadata = {
-  title: "Erda Encyclopedia",
-  description: "基于 Erda Book 证据回答问题的知识应用。",
+  title: "提问 · 艾尔达百科",
+  description: "从《艾尔达之书》的检索证据中寻找答案，并逐条核验引用来源。",
 };
 
 export default function Home() {
-  return <main><h1>Erda Encyclopedia</h1><p>站点基础已就绪，界面由 site-ui workstream 实现。</p></main>;
+  return <ChatExperience />;
 }
