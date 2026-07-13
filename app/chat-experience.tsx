@@ -2,6 +2,7 @@
 
 import { FormEvent, KeyboardEvent, useRef, useState } from "react";
 import type { ChatErrorCode, ChatStreamEvent, RetrievedSource } from "@/src/contracts/rag";
+import { buildChatHistory } from "./chat-history";
 import { parseChatStream } from "./ndjson";
 
 type PublicSource = Omit<RetrievedSource, "text">;
@@ -50,10 +51,7 @@ export function ChatExperience() {
     if (!text || pending.current) return;
     pending.current = true;
     const id = nextId.current++;
-    const history = exchanges.slice(-3).flatMap((item) => [
-      { role: "user" as const, content: item.question },
-      { role: "assistant" as const, content: item.answer },
-    ]).slice(-6);
+    const history = buildChatHistory(exchanges);
 
     setQuestion("");
     setIsSubmitting(true);
