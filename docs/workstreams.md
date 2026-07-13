@@ -10,7 +10,7 @@ do not place transient state in `AGENTS.md`.
 | rag | `codex/rag` | ingestion, retriever, diagnostics | foundation | complete (`19ea6ef`, from `fc09b62`) |
 | site-ui | `codex/site-ui` | UI, streaming UX, metadata | foundation | complete (`759f995`, from `5f903b6`) |
 | evals | `codex/evals` | datasets, runners, metrics | foundation | complete (`cfcc94b`, from `4098a5c`) |
-| integration | `codex/integration` | merge, E2E fixes, hosting, deploy | rag, site-ui, evals | code complete (`dc81027`); functional deployment blocked by missing OpenAI secrets |
+| integration | `codex/integration` | merge, E2E fixes, hosting, deploy | rag, site-ui, evals | private deployment complete; chat runtime blocked by missing OpenAI secrets |
 
 ## Ownership collision policy
 
@@ -122,8 +122,9 @@ Handoffs are appended here by the integration workstream after verification.
 - Configuration required: `OPENAI_API_KEY` and `OPENAI_VECTOR_STORE_ID` as Sites secrets;
   `OPENAI_MODEL` is optional and defaults to `gpt-5.6-luna`.
 - Known limitations: Live sync, representative `rag:inspect`, live endpoint/model validation,
-  and a fully functional deployed chat remain blocked until the two required secrets are
-  supplied. Without them the deployable endpoint returns the explicit `NOT_CONFIGURED` state.
+  and functional chat remain blocked until the two required secrets are supplied. The private
+  deployment at `https://erda-encyclopedia.yjnyjpwgsf.chatgpt.site` succeeds and its endpoint
+  returns the explicit `NOT_CONFIGURED` state until then.
 - Files intentionally not modified: All canonical `ErdaBook/**` content, D1/R2/auth/history
   scope, and dependency/lockfile versions.
 - Recommended merge order: This is the final integration branch after foundation, RAG, UI,
