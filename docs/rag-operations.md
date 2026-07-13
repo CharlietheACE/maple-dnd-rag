@@ -42,8 +42,9 @@ and atomically replacing `src/rag/generated/dashscope-index.json`. Console outpu
 only counts, model/dimensions, dry-run state, and the relative output path; it never prints
 the key or full chunks.
 
-The checked-in empty index is only a build-safe placeholder. Coordination must replace it
-with the generated 40-document index before deployment.
+The checked-in production index contains 40 documents and 294 chunks generated with
+`text-embedding-v4` at 1024 dimensions. Before deployment, verify its schema and client
+bundle boundary again after any regeneration; runtime model and dimensions must match it.
 
 ## Retrieval inspection
 

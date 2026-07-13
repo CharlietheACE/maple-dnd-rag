@@ -10,7 +10,7 @@ do not place transient state in `AGENTS.md`.
 | rag | `codex/rag` | ingestion, retriever, diagnostics | foundation | complete (`19ea6ef`, from `fc09b62`) |
 | site-ui | `codex/site-ui` | UI, streaming UX, metadata | foundation | complete (`759f995`, from `5f903b6`) |
 | evals | `codex/evals` | datasets, runners, metrics | foundation | complete (`cfcc94b`, from `4098a5c`) |
-| integration | `codex/integration` | merge, E2E fixes, hosting, deploy | rag, site-ui, evals | DashScope provider-neutral migration code complete; real index generation and deployment pending coordination |
+| integration | `codex/integration` | merge, E2E fixes, hosting, deploy | rag, site-ui, evals | DashScope code and real 40-document index complete; Sites environment and deployment pending coordination |
 
 ## Ownership collision policy
 
@@ -208,3 +208,25 @@ Handoffs are appended here by the integration workstream after verification.
 - Recommended merge order: Apply after the production-sync cleanup, then let coordination
   generate the real index, run representative retrieval/chat checks, configure Sites, and
   deploy privately.
+
+### DashScope real index handoff
+
+- Branch: `codex/integration`
+- Commit: Real generated-index commit containing this handoff.
+- Delivered: Replaced the empty build-safe placeholder with the deterministic production
+  DashScope index: 40 unique documents, 294 unique chunks, `text-embedding-v4`, and 1024
+  dimensions. Every document chunk reference resolves to a unique indexed chunk.
+- Public interfaces changed: None. `Retriever`, `RetrievedSource`, `/api/chat`, NDJSON, and
+  UI contracts remain unchanged.
+- Validation performed: Offline schema/version/vector validation passed; index SHA-256 is
+  `dc0ea26c6a3fbfcd0f789987017c332b9a32bfd0e019519ca7acd600735b29b1`. All 34 tests,
+  typecheck, lint, production build, and client-leak gate passed. The generated index marker
+  appears only in the server bundle and zero times in 13 checked client files.
+- Configuration required: Coordination must configure the five matching `DASHSCOPE_*`
+  runtime keys in Sites before saving and deploying a new private version.
+- Known limitations: This handoff does not configure Sites, call DashScope, save a Sites
+  version, or deploy. Live chat verification remains a coordination deployment task.
+- Files intentionally not modified: `ErdaBook/**`, UI visuals, public contracts, Sites
+  environment, and hosting/deployment state.
+- Recommended merge order: Apply after migration commit `624634a`, then configure matching
+  Sites runtime values and privately deploy the exact indexed source state.
