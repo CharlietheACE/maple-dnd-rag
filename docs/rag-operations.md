@@ -13,6 +13,7 @@ Set these server-side values; never expose or commit them:
 
 - `OPENAI_API_KEY`
 - `OPENAI_VECTOR_STORE_ID`
+- `OPENAI_MODEL` (optional; defaults to the cost-sensitive `gpt-5.6-luna`)
 
 Dry-run needs neither value because it performs local planning only. An apply or
 retrieval inspection requires both values.
