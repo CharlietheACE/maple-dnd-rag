@@ -129,3 +129,24 @@ Handoffs are appended here by the integration workstream after verification.
   scope, and dependency/lockfile versions.
 - Recommended merge order: This is the final integration branch after foundation, RAG, UI,
   evals, and the coordination ledger.
+
+### Integration history hotfix handoff
+
+- Branch: `codex/integration`
+- Commit: `ded3506`
+- Delivered: Extracted pure `buildChatHistory` construction and changed the client to include
+  only successful `done` exchanges whose question and answer are both non-empty. History keeps
+  the original order of the latest three successful rounds (six messages); failed,
+  `NOT_CONFIGURED`, streaming, and empty-answer exchanges are excluded.
+- Public interfaces changed: None; `ChatRequest.history` retains the existing contract.
+- Validation performed: Typecheck, lint, production build, and all 25 unit tests passed,
+  including regression coverage for failed empty answers, successful ordering, and the
+  three-round/six-message limit. Sites version 2 deployed privately with status `succeeded`.
+- Configuration required: `OPENAI_API_KEY` and `OPENAI_VECTOR_STORE_ID` remain required as
+  Sites secrets for functional RAG; deployment environment revision remains 0 with no entries.
+- Known limitations: Until those secrets are supplied, `/api/chat` intentionally returns
+  `NOT_CONFIGURED`; the history hotfix prevents that failed exchange from poisoning the next
+  request. The deployed URL remains `https://erda-encyclopedia.yjnyjpwgsf.chatgpt.site`.
+- Files intentionally not modified: `ErdaBook/**`, server validation rules, RAG ingestion,
+  evaluation datasets, dependencies, and lockfile.
+- Recommended merge order: Apply after the original integration deployment commits.
