@@ -1,115 +1,91 @@
 # RAG operations
 
-## Scope and source of truth
+## Production scope
 
-The RAG workstream indexes only UTF-8 `ErdaBook/**/*.md`. It never rewrites those
-files. Each indexed file carries `source_path`, `title`, `category`,
-`content_hash`, and `sync_version` attributes. The local `.rag/manifest.json`
-also records both remote IDs, indexing time, and the exact chunking configuration.
+Production scans only UTF-8 `ErdaBook/**/*.md`. It never rewrites canonical documents.
+Each generated chunk carries `path`, `title`, `category`, `contentHash`, and deterministic
+`chunkId`. The server-only index also records schema/version, heading-aware chunking,
+embedding model, dimensions, documents, chunk text, and vectors.
 
-## Configuration
+## Server configuration
 
-Set these server-side values; never expose or commit them:
+Configure these only in the trusted index-generation environment and Sites server runtime:
 
-- `OPENAI_API_KEY`
-- `OPENAI_VECTOR_STORE_ID`
-- `OPENAI_MODEL` (optional; defaults to the cost-sensitive `gpt-5.6-luna`)
+- `DASHSCOPE_API_KEY` (required secret)
+- `DASHSCOPE_BASE_URL` (compatible API base URL)
+- `DASHSCOPE_CHAT_MODEL` (defaults to `qwen-plus`)
+- `DASHSCOPE_EMBEDDING_MODEL` (defaults to `text-embedding-v4`)
+- `DASHSCOPE_EMBEDDING_DIMENSIONS` (defaults to `1024`)
 
-Dry-run needs neither value because it performs local planning only. An apply or
-retrieval inspection requires both values.
+The embedding model and dimensions must exactly match the generated index. Missing runtime
+configuration, an empty/missing index, or a mismatch returns `NOT_CONFIGURED` without
+calling chat generation.
 
-The implementation uses the platform `fetch`, `FormData`, and `Blob` APIs and has
-no OpenAI SDK dependency. The HTTP transport can be replaced by a mock for tests.
+## Deterministic index generation
 
-## Incremental sync
-
-Preview every sync first:
-
-```powershell
-node --experimental-strip-types scripts/rag-sync.ts --dry-run
-```
-
-Apply the plan:
+Preview the canonical scan and chunk plan without credentials, provider calls, or writes:
 
 ```powershell
-node --experimental-strip-types scripts/rag-sync.ts
+npm run dashscope:index:dry-run
 ```
 
-The plan classifies paths as add, replace, delete, or no-op. Dry-run performs no
-remote mutation and does not write a manifest. For replacements, the new file is
-uploaded, attached, and confirmed `completed` before the previous vector-store
-file and uploaded file are removed. The manifest is written through a temporary
-file and atomic rename only after all required operations succeed. If indexing
-fails, the newly uploaded file is cleaned up and the previous manifest/index is
-retained. Re-run the same command after correcting a partial failure.
+Generate the real server-only index in a trusted environment after setting the five
+`DASHSCOPE_*` values:
 
-Default chunking is static: 800 maximum tokens with 400 overlap tokens. Changing
-this is an indexing-version change and should be evaluated before integration.
+```powershell
+npm run dashscope:index
+```
+
+The generator sends at most ten chunks per embeddings request. It validates response count,
+ordering, finite vector values, and dimensions before writing a temporary UTF-8 JSON file
+and atomically replacing `src/rag/generated/dashscope-index.json`. Console output contains
+only counts, model/dimensions, dry-run state, and the relative output path; it never prints
+the key or full chunks.
+
+The checked-in empty index is only a build-safe placeholder. Coordination must replace it
+with the generated 40-document index before deployment.
 
 ## Retrieval inspection
 
-Inspect the actual top results locally:
+After real generation, inspect representative and no-evidence queries locally:
 
 ```powershell
-node --experimental-strip-types scripts/rag-inspect.ts "赫纳西斯在哪里？"
+npm run dashscope:inspect -- "艾尔达是什么？"
 ```
 
-The command prints result ID, OpenAI file ID, real source path/title/category,
-score, content hash, and retrieved chunk text. Chunk text is intentionally shown
-only by this local diagnostic; production logging must not emit full chunks.
+The diagnostic prints local top-k score, path, metadata, and chunk text. Do not run it in
+production logging or attach its output to public build logs.
 
-The adapter calls `POST /v1/vector_stores/{vector_store_id}/search`. It maps the
-provider response to the shared `Retriever` contract and supports equality filters
-over indexed attributes. `maxResults` must be an integer from 1 through 50.
-
-## Verification and recovery
-
-Run targeted checks before handoff:
+## Validation
 
 ```powershell
+npm run dashscope:index:dry-run
 npm test
 npm run typecheck
+npm run lint
 npm run build
+npm run check:client-index
 ```
 
-An online smoke test additionally requires a non-production test vector store:
+Before deployment, also verify that the generated index reports 40 documents, that its
+model/dimensions equal the Sites runtime configuration, and that representative retrieval
+returns real `ErdaBook/` paths. Client bundle checking must report zero index markers.
 
-1. Run dry-run and review every planned path.
-2. Apply sync and confirm the manifest contains the expected hashes and IDs.
-3. Run `rag-inspect` with representative and no-evidence queries.
-4. Confirm returned paths and text match the canonical Markdown.
+## Error behavior
 
-Do not edit the manifest by hand to conceal a remote failure. If local state is
-lost, reconcile remote files explicitly before rebuilding it; a blind empty-manifest
-sync can duplicate every source. Never delete remote data based on a dry-run.
+- Invalid or unauthorized DashScope credentials: `NOT_CONFIGURED`
+- Provider quota/rate limit: `RATE_LIMITED`
+- Abort, HTTP 408, or HTTP 504: `UPSTREAM_TIMEOUT`
+- Other provider or malformed payload failures: `UPSTREAM_ERROR`
+- No retrieved chunk above the relevance threshold: `NO_EVIDENCE`
 
-## Production sync status
+Error payloads never contain provider bodies, credentials, complete chunks, or vectors.
 
-The private Sites runtime completed the one-time production sync of all 40 supported
-`ErdaBook/**/*.md` documents. A subsequent idempotence pass processed the same 40 paths
-and reported all 40 as skipped, confirming that the vector store already held the current
-content hashes without duplicate additions.
+## Legacy OpenAI adapter
 
-The temporary browser sync console, admin endpoint, embedded corpus, and sync token are
-not permanent operational surfaces and were removed after verification. The hosted runtime
-keeps only `OPENAI_API_KEY`, `OPENAI_MODEL`, and `OPENAI_VECTOR_STORE_ID` at environment
-revision 4.
-
-Two production chat smoke tests reached the OpenAI service but returned HTTP 429. The
-application correctly maps this response to `RATE_LIMITED`; further live-answer verification
-is blocked until the OpenAI project quota or rate limit is available.
-
-## Current platform shapes
-
-The implementation was checked against current official OpenAI documentation:
-
-- Files upload is multipart `POST /v1/files`; `assistants` is an accepted purpose.
-- Vector-store file creation accepts file attributes and a static chunking strategy.
-- Vector-store search returns file ID, filename, score, attributes, and text content.
-- Responses API File Search uses `tools[].type = "file_search"` and
-  `vector_store_ids`; answer orchestration must request
-  `include: ["file_search_call.results"]` to retain result details.
-
-The RAG workstream does not implement Responses answer orchestration. Integration
-must perform the live API validation because no real API key is committed or
-available to unit tests.
+`scripts/rag-sync.ts`, `scripts/rag-inspect.ts`, `src/rag/openai-transport.ts`,
+`src/rag/openai-retriever.ts`, manifest, and remote-sync modules remain only as offline
+learning/reference code for the historical OpenAI Vector Store implementation. They may use
+legacy `OPENAI_*` variables when invoked explicitly, but production `/api/chat`, server
+configuration, generation, and deployment do not reference them. OpenAI-managed files and
+vectors cannot be transferred to DashScope; see ADR 0002.

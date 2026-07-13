@@ -10,7 +10,7 @@ do not place transient state in `AGENTS.md`.
 | rag | `codex/rag` | ingestion, retriever, diagnostics | foundation | complete (`19ea6ef`, from `fc09b62`) |
 | site-ui | `codex/site-ui` | UI, streaming UX, metadata | foundation | complete (`759f995`, from `5f903b6`) |
 | evals | `codex/evals` | datasets, runners, metrics | foundation | complete (`cfcc94b`, from `4098a5c`) |
-| integration | `codex/integration` | merge, E2E fixes, hosting, deploy | rag, site-ui, evals | code, 40-document sync, and private deployment complete; live chat externally rate-limited |
+| integration | `codex/integration` | merge, E2E fixes, hosting, deploy | rag, site-ui, evals | DashScope provider-neutral migration code complete; real index generation and deployment pending coordination |
 
 ## Ownership collision policy
 
@@ -177,3 +177,34 @@ Handoffs are appended here by the integration workstream after verification.
   dependencies, and lockfile.
 - Recommended merge order: This is the final cleanup after the one-time production sync and
   supersedes the temporary sync-console deployment.
+
+### DashScope provider-neutral migration handoff
+
+- Branch: `codex/integration`
+- Commit: Migration implementation commit containing this handoff.
+- Delivered: Deterministic UTF-8 heading-aware chunking, auditable embedded-index schema,
+  batched DashScope embeddings transport, cosine `LocalVectorRetriever`, explicit retrieval
+  before grounded DashScope chat completions, normalized errors, dry-run/generate/inspect
+  scripts, server-only index boundary checks, and migration ADR. The UI and NDJSON contracts
+  are unchanged.
+- Public interfaces changed: No semantic changes to `Retriever`, `RetrievedSource`,
+  `ChatRequest`, `ChatStreamEvent`, or `/api/chat`. Runtime configuration now uses only the
+  five `DASHSCOPE_*` keys. The production path no longer calls OpenAI Responses/File Search.
+- Validation performed: No-secret dry-run scanned all 40 canonical documents and planned
+  294 deterministic chunks using `text-embedding-v4` at 1024 dimensions. Mock/fixture tests
+  cover chunk/index determinism, cosine ranking, metadata/citations, abstention, prompt
+  injection, history, missing/mismatched index/config, provider 401/429/timeout failures,
+  batch limits, and the client/server index boundary. Final full gate results are reported
+  with the integration delivery.
+- Configuration required: Coordination must set `DASHSCOPE_API_KEY`, `DASHSCOPE_BASE_URL`,
+  `DASHSCOPE_CHAT_MODEL`, `DASHSCOPE_EMBEDDING_MODEL`, and
+  `DASHSCOPE_EMBEDDING_DIMENSIONS`; generate and commit the real 40-document index before
+  saving or deploying a Sites version.
+- Known limitations: The checked-in JSON index is intentionally empty and therefore returns
+  `NOT_CONFIGURED` until coordination performs real embedding generation. No real DashScope
+  API call, Sites environment mutation, or deployment is claimed in this workstream turn.
+- Files intentionally not modified: `ErdaBook/**`, UI visuals, shared public contract shapes,
+  D1/R2/auth/history scope, and provider secrets.
+- Recommended merge order: Apply after the production-sync cleanup, then let coordination
+  generate the real index, run representative retrieval/chat checks, configure Sites, and
+  deploy privately.

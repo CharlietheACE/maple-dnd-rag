@@ -1,0 +1,1 @@
+{"schema":"erda-dashscope-index","version":1,"chunking":{"strategy":"markdown-heading-aware","targetCharacters":1200,"overlapCharacters":200},"model":"text-embedding-v4","dimensions":1024,"documents":[],"chunks":[]}

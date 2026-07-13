@@ -12,7 +12,11 @@
     "test": "node --experimental-strip-types --test tests/*.test.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
-    "check": "npm run typecheck && npm run test && npm run build"
+    "dashscope:index:dry-run": "node --experimental-strip-types scripts/dashscope-index.ts --dry-run",
+    "dashscope:index": "node --experimental-strip-types scripts/dashscope-index.ts",
+    "dashscope:inspect": "node --experimental-strip-types scripts/dashscope-inspect.ts",
+    "check:client-index": "node --experimental-strip-types scripts/check-client-index.ts",
+    "check": "npm run typecheck && npm run test && npm run build && npm run check:client-index"
   },
   "dependencies": {
     "next": "16.2.6",
