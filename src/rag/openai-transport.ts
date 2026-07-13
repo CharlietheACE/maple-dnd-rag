@@ -31,7 +31,7 @@ export class FetchOpenAITransport implements OpenAITransport {
     return this.request("/files", { method: "POST", body: form }) as Promise<{ id: string }>;
   }
   attach(vectorStoreId: string, fileId: string, metadata: SourceMetadata, chunking: ChunkingConfig) {
-    return this.request(`/vector_stores/${encodeURIComponent(vectorStoreId)}/files`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ file_id: fileId, attributes: { source_path: metadata.path, title: metadata.title, category: metadata.category, content_hash: metadata.contentHash, sync_version: metadata.syncVersion }, chunking_strategy: { type: chunking.type, max_chunk_size_tokens: chunking.maxChunkSizeTokens, chunk_overlap_tokens: chunking.chunkOverlapTokens } }) }) as Promise<{ id: string; status?: string }>;
+    return this.request(`/vector_stores/${encodeURIComponent(vectorStoreId)}/files`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ file_id: fileId, attributes: { source_path: metadata.path, title: metadata.title, category: metadata.category, content_hash: metadata.contentHash, sync_version: metadata.syncVersion }, chunking_strategy: { type: chunking.type, static: { max_chunk_size_tokens: chunking.maxChunkSizeTokens, chunk_overlap_tokens: chunking.chunkOverlapTokens } } }) }) as Promise<{ id: string; status?: string }>;
   }
   async waitUntilIndexed(vectorStoreId: string, id: string) {
     for (let attempt = 0; attempt < 60; attempt++) {
