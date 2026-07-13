@@ -83,6 +83,22 @@ Do not edit the manifest by hand to conceal a remote failure. If local state is
 lost, reconcile remote files explicitly before rebuilding it; a blind empty-manifest
 sync can duplicate every source. Never delete remote data based on a dry-run.
 
+## Production sync status
+
+The private Sites runtime completed the one-time production sync of all 40 supported
+`ErdaBook/**/*.md` documents. A subsequent idempotence pass processed the same 40 paths
+and reported all 40 as skipped, confirming that the vector store already held the current
+content hashes without duplicate additions.
+
+The temporary browser sync console, admin endpoint, embedded corpus, and sync token are
+not permanent operational surfaces and were removed after verification. The hosted runtime
+keeps only `OPENAI_API_KEY`, `OPENAI_MODEL`, and `OPENAI_VECTOR_STORE_ID` at environment
+revision 4.
+
+Two production chat smoke tests reached the OpenAI service but returned HTTP 429. The
+application correctly maps this response to `RATE_LIMITED`; further live-answer verification
+is blocked until the OpenAI project quota or rate limit is available.
+
 ## Current platform shapes
 
 The implementation was checked against current official OpenAI documentation:

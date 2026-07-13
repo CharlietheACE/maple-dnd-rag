@@ -10,7 +10,7 @@ do not place transient state in `AGENTS.md`.
 | rag | `codex/rag` | ingestion, retriever, diagnostics | foundation | complete (`19ea6ef`, from `fc09b62`) |
 | site-ui | `codex/site-ui` | UI, streaming UX, metadata | foundation | complete (`759f995`, from `5f903b6`) |
 | evals | `codex/evals` | datasets, runners, metrics | foundation | complete (`cfcc94b`, from `4098a5c`) |
-| integration | `codex/integration` | merge, E2E fixes, hosting, deploy | rag, site-ui, evals | private deployment complete; chat runtime blocked by missing OpenAI secrets |
+| integration | `codex/integration` | merge, E2E fixes, hosting, deploy | rag, site-ui, evals | code, 40-document sync, and private deployment complete; live chat externally rate-limited |
 
 ## Ownership collision policy
 
@@ -150,3 +150,30 @@ Handoffs are appended here by the integration workstream after verification.
 - Files intentionally not modified: `ErdaBook/**`, server validation rules, RAG ingestion,
   evaluation datasets, dependencies, and lockfile.
 - Recommended merge order: Apply after the original integration deployment commits.
+
+### Integration production-sync cleanup handoff
+
+- Branch: `codex/integration`
+- Commit: Final production-sync cleanup commit containing this handoff.
+- Delivered: Verified the remote vector store contains all 40 canonical Erda Book Markdown
+  documents. The final idempotence pass processed 40 documents and skipped all 40 without
+  adding duplicates. Removed the temporary admin sync page, sync API, same-origin bypass,
+  embedded server corpus, runtime-only sync transport, generator, and temporary tests after
+  the one-time operation completed. Preserved the production chat/RAG path and the official
+  nested static chunking request shape in both OpenAI transport coverage paths.
+- Public interfaces changed: Removed the temporary `/admin/rag-sync` and
+  `/api/admin/rag-sync` operational surfaces. The permanent `POST /api/chat` contract is
+  unchanged.
+- Validation performed: The one-time console reached cursor 40 with 40 processed documents;
+  an idempotence rerun reported 40 skipped. Two real production chat attempts reached OpenAI
+  and returned HTTP 429, which the UI correctly normalized to `RATE_LIMITED`. The final test,
+  typecheck, lint, build, private deployment, and temporary-route removal checks are recorded
+  in the integration delivery response.
+- Configuration required: Sites runtime retains only `OPENAI_API_KEY`, `OPENAI_MODEL`, and
+  `OPENAI_VECTOR_STORE_ID`; the temporary sync token was removed at environment revision 4.
+- Known limitations: Functional live answers are currently blocked by the external OpenAI
+  project quota/rate limit. This is not a grounding, routing, or Sites configuration failure.
+- Files intentionally not modified: `ErdaBook/**`, shared chat contracts, evaluation data,
+  dependencies, and lockfile.
+- Recommended merge order: This is the final cleanup after the one-time production sync and
+  supersedes the temporary sync-console deployment.
