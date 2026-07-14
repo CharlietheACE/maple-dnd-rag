@@ -20,9 +20,10 @@ remaining a useful learning project for enterprise-grade RAG engineering.
 
 ## Architecture boundaries
 
-- The first backend is OpenAI Vector Store and File Search behind `Retriever`.
+- The production backend is DashScope embeddings over a deterministic server-only
+  embedded index behind `Retriever`; answer generation uses DashScope chat completions.
 - UI and answer orchestration must not call the OpenAI SDK directly.
-- API keys and vector store IDs are server-side secrets.
+- Provider API keys and generated vector indexes are server-side only.
 - Do not add D1, R2, public access, persistent chat history, authentication, or a
   second vector database unless the user expands scope.
 - Public contracts are defined in `docs/architecture.md`. Do not fork equivalent
@@ -31,15 +32,14 @@ remaining a useful learning project for enterprise-grade RAG engineering.
 ## Retrieval, citation, and ingestion
 
 - Every factual answer must cite at least one retrieved source.
-- Retain File Search result details for citation and evaluation.
-- Metadata must include source path, title, content hash, category, and sync version
-  where supported.
-- Changed sources are replaced: index the new file successfully before removing
-  the previous vector-store file.
+- Retain retrieved chunk text, score, path, and metadata for citation and evaluation.
+- Metadata must include source path, title, content hash, category, and deterministic
+  chunk ID; generated indexes also record schema, chunking, model, and dimensions.
 - Diagnostics must expose top-k text, score, path, and metadata.
 - Scan only supported files under `ErdaBook/`; treat Markdown as UTF-8.
-- Preserve headings, use deterministic SHA-256 hashes, and update manifests atomically.
-- Sync commands must support dry-run and never delete remote data during dry-run.
+- Preserve heading context, use deterministic SHA-256 hashes, and replace generated
+  indexes atomically only after every embedding validates.
+- Index generation must support dry-run and perform no provider calls or writes in dry-run.
 - Record the chunking configuration for every indexed version.
 - Never log secrets or full retrieved chunks in production by default.
 

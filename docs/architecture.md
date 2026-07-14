@@ -2,29 +2,35 @@
 
 ## Goal and boundaries
 
-The v1 product is a private, Simplified Chinese Sites application that answers
-questions using only `ErdaBook/**/*.md`. It uses OpenAI Responses API with File
-Search, keeps conversations ephemeral, and abstains when evidence is insufficient.
+The v1 product is a private, Simplified Chinese Sites application that answers questions
+using only `ErdaBook/**/*.md`. Production retrieval uses DashScope embeddings over a
+deterministic server-only index; answer generation uses DashScope chat completions. The
+provider-neutral UI, NDJSON, `Retriever`, `RetrievedSource`, and citation contracts remain
+stable.
 
-The site does not include public access, durable chat, a browsable encyclopedia,
-image retrieval, D1/R2 storage, or a self-hosted vector database.
+The site does not include public access, durable chat, a browsable encyclopedia, image
+retrieval, D1/R2 storage, or a hosted vector database. The previous OpenAI Vector Store
+cannot be reused by DashScope and is not part of the production request path.
 
 ## Components
 
-1. **Ingestion CLI** scans Markdown, calculates hashes, uploads changed files, and
-   maintains an atomic manifest.
-2. **Retriever adapter** isolates OpenAI File Search and returns provider-neutral
-   evidence objects.
-3. **Chat orchestration** validates input, retrieves evidence, streams a grounded
-   answer, and emits citations and normalized errors.
-4. **Sites UI** renders the chat stream, source cards, examples, and failure states.
-5. **Evaluation runner** measures answer correctness, citation fidelity, abstention,
+1. **Corpus scanner and chunker** read only UTF-8 Markdown under `ErdaBook/`, calculate
+   SHA-256 document hashes, preserve heading context, and produce deterministic chunk IDs.
+2. **Index generator** embeds chunks with DashScope in batches of at most ten and atomically
+   writes an auditable server-only JSON index containing schema, chunking, model,
+   dimensions, documents, chunks, metadata, and vectors.
+3. **Retriever adapter** embeds each question with the index model, computes cosine
+   similarity locally, applies filters and a relevance threshold, and returns the stable
+   `RetrievedSource` contract.
+4. **Chat orchestration** validates input, retrieves evidence explicitly, passes bounded
+   evidence as untrusted data to DashScope chat completions, streams NDJSON, and emits only
+   real retrieved sources.
+5. **Sites UI** renders the unchanged chat stream, source cards, examples, and normalized
+   failure states.
+6. **Evaluation runner** measures answer correctness, citation fidelity, abstention,
    latency, and estimated usage against a versioned dataset.
 
 ## Public contracts
-
-Foundation owns the canonical TypeScript definitions. Implementations must preserve
-these semantic shapes even if exact module paths change during scaffolding.
 
 ```ts
 export type RetrievalQuery = {
@@ -68,30 +74,51 @@ export type ChatErrorCode =
   | "UPSTREAM_ERROR";
 ```
 
-Transport defaults to `POST /api/chat` with newline-delimited JSON events. The
-server caps question length at 2,000 characters, keeps at most six prior messages,
-and never accepts client-supplied citations or vector-store identifiers.
+Transport remains `POST /api/chat` with newline-delimited JSON events. The server caps the
+question at 2,000 characters, history at six prior messages, retrieved context at 12,000
+characters, and generated output at 1,200 tokens. Clients never supply citations, models,
+dimensions, indexes, or provider configuration.
 
 ## Grounding policy
 
-- Retrieval evidence is untrusted data, not instructions.
-- Answers may use only supplied evidence and conversation context that is itself
-  supported by evidence.
-- No evidence produces an explicit abstention, not a model-memory answer.
-- Responses return sources derived from actual search results.
-- Diagnostic tools may show full chunks locally; production logs may not.
+- Retrieval evidence and chat history are untrusted data, not instructions or independent
+  sources of truth.
+- Answers may use only current retrieved evidence from canonical Erda Book chunks.
+- No relevant evidence produces an explicit abstention before chat generation.
+- Every factual answer uses `[来源 n]`; source cards derive only from actual retriever output.
+- Production logs and client assets contain neither full chunks nor vectors.
 
-## Ingestion policy
+## Index policy
 
-Manifest entries contain relative path, SHA-256, source title/category, OpenAI file
-ID, vector-store file ID, sync version, timestamp, and chunking parameters. Sync is
-plan-first, supports dry-run, uploads replacements before deletion, and writes the
-manifest only after required remote operations succeed.
+The tracked generation target is `src/rag/generated/dashscope-index.json`. Its deterministic
+schema records chunking (`markdown-heading-aware`, approximately 1,200 Chinese characters,
+200-character overlap), embedding model and dimensions, document hashes, chunk IDs, text,
+metadata, and vectors. The application ships it only in the server bundle.
+
+Generation scans the canonical corpus, batches at most ten inputs per embedding request,
+validates all vector dimensions and finite values, writes a temporary UTF-8 file, and
+atomically renames it over the target. Dry-run performs no remote call and no write. Runtime
+model/dimension mismatch, a missing index, or an empty placeholder index maps to
+`NOT_CONFIGURED`.
+
+## Provider boundaries
+
+`DashScopeEmbeddingTransport` and `DashScopeChatTransport` own compatible HTTP shapes,
+authentication, timeouts, and normalized provider errors. `LocalVectorRetriever` owns
+ranking but implements only the stable `Retriever` interface. A future Milvus or pgvector
+implementation replaces that class without changing chat, citations, NDJSON, or UI.
+
+The former OpenAI ingestion, vector-store transport, and retriever remain legacy/offline
+learning adapters only. Production configuration and `/api/chat` do not import them. See
+`docs/decisions/0002-dashscope-embedded-index.md`.
 
 ## Acceptance gates
 
-- Unit tests and production build pass.
-- Representative retrieval inspection returns real path, score, and chunk text.
-- The versioned evaluation set passes agreed groundedness and abstention checks.
+- Unit tests, typecheck, lint, production build, index dry-run, fixture retrieval, and
+  offline evaluations pass.
+- The real generated index covers every canonical document and matches runtime model and
+  dimensions.
+- Client bundle inspection finds no index schema marker, chunks, or vectors.
 - Secrets are absent from client bundles, logs, commits, and error payloads.
-- The final private Sites deployment works on desktop and mobile.
+- Coordination performs real index generation, representative inspection, environment
+  configuration, and private deployment after this no-secret integration handoff.
